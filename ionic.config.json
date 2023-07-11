@@ -1,0 +1,7 @@
+{
+  "name": "mobile-docker-maker",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react"
+}

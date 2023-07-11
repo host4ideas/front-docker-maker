@@ -1,0 +1,142 @@
+# Node.js with React
+# Build a Node.js project that uses React.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+
+variables:
+  storageAccountName: 'dockermakerandroidrepo' #Your storage account name
+  containerName: 'app' #The container name which you want to copy files to
+
+trigger:
+- master
+
+jobs:
+- job: build_and_deploy_job
+  displayName: Build and Deploy Job
+  condition: or(eq(variables['Build.Reason'], 'Manual'),or(eq(variables['Build.Reason'], 'PullRequest'),eq(variables['Build.Reason'], 'IndividualCI')))
+  pool:
+    vmImage: ubuntu-latest
+  variables:
+  - group: Azure-Static-Web-Apps-blue-river-041ba4e03-variable-group
+  steps:
+  - checkout: self
+    submodules: true
+
+  - task: DownloadSecureFile@1
+    name: "dotenvProduction"
+    inputs:
+      secureFile: '.env.production.local'
+    displayName: "Download .env.production.local"
+
+  - task: CopyFiles@2
+    inputs:
+      sourceFolder: "$(Agent.TempDirectory)"
+      contents: ".env.production.local"
+      targetFolder: "$(System.DefaultWorkingDirectory)"
+    displayName: "Import .env.production.local"
+    
+  - task: DownloadSecureFile@1
+    name: "dotenvAndroid"
+    inputs:
+      secureFile: '.env.android.local'
+    displayName: "Download .env.android.local"
+
+  - task: CopyFiles@2
+    inputs:
+      sourceFolder: "$(Agent.TempDirectory)"
+      contents: ".env.android.local"
+      targetFolder: "$(System.DefaultWorkingDirectory)"
+    displayName: "Import .env.android.local"
+
+  - task: CmdLine@2
+    inputs:
+      script: |
+        npm ci
+      workingDirectory: "$(System.DefaultWorkingDirectory)"
+    displayName: "npm install"
+    
+  - task: CmdLine@2
+    inputs:
+      script: |
+        npm run lint
+      workingDirectory: "$(System.DefaultWorkingDirectory)"
+    displayName: "npm run lint"
+  
+  - task: CmdLine@2
+    inputs:
+      script: |
+        npm run build-web
+      workingDirectory: "$(System.DefaultWorkingDirectory)"
+    displayName: "npm run build-web"
+
+  - task: CmdLine@2
+    inputs:
+      script: |
+        npm run build-android
+      workingDirectory: "$(System.DefaultWorkingDirectory)"
+    displayName: "npm run build-android"
+
+  - task: CmdLine@2
+    inputs:
+      script: |
+        npx cap sync
+      workingDirectory: "$(System.DefaultWorkingDirectory)"
+    displayName: "Update Android project"
+
+  - task: JavaToolInstaller@0
+    inputs:
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
+  - task: CmdLine@2
+    inputs:
+      script: |
+        cd ./android
+        chmod +x gradlew
+        ./gradlew assembleDebug
+        #./gradlew assembleRelease
+      workingDirectory: "$(System.DefaultWorkingDirectory)"
+    displayName: "Android build debug app"
+
+  - task: DeleteFiles@1
+    inputs:
+      SourceFolder: "$(System.DefaultWorkingDirectory)"
+      Contents: 'node_modules'
+      RemoveSourceFolder: true
+    displayName: "Delete node_modules"
+
+  - task: CopyFiles@2
+    inputs:
+      sourceFolder: "$(System.DefaultWorkingDirectory)"
+      contents: "staticwebapp.config.json"
+      targetFolder: "$(System.DefaultWorkingDirectory)/web-build"
+    displayName: "Copy webapp config to web-build"
+
+  - task: AzureStaticWebApp@0
+    inputs:
+      azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APPS_API_TOKEN_BLUE_RIVER_041BA4E03)
+###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
+# For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
+      skip_api_build: true
+      skip_app_build: true
+      is_static_export: true
+      app_location: "/web-build"
+      output_location: "/web-build" # Built app content directory - optional
+    displayName: "Deploy Static Web App"
+###### End of Repository/Build Configurations ######
+
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: '$(System.DefaultWorkingDirectory)/android/app/build/outputs/apk/debug/'
+      Contents: '**/*.apk'
+      TargetFolder: '$(System.ArtifactsDirectory)/android-app/'
+
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'Azure subscription'
+      scriptType: 'pscore'
+      scriptLocation: 'inlineScript'
+      workingDirectory: "$(System.DefaultWorkingDirectory)"
+      inlineScript: 'az storage blob upload-batch --destination "$(containerName)" --account-name "$(storageAccountName)" --source "$(System.ArtifactsDirectory)/android-app/"'
+    displayName: "Upload Android App"
