@@ -1,6 +1,6 @@
 # Vite + React 18 + TS + TailwindCSS + ESLint + Capacitor
 
-## Configuraciones del proyecto
+## Project configurations
 
 ## Vite
 
