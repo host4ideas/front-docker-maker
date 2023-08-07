@@ -1,20 +1,24 @@
-import { defineConfig } from 'vite'
+import { UserConfigExport, defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ mode }) => {
-  if (mode && mode === 'android') {
-    return {
-      plugins: [react()],
-      build: {
-        outDir: 'android-build'
-      }
+  const userConfig: UserConfigExport = {
+    plugins: [react()]
+  }
+
+  if (mode === 'android') {
+    userConfig.build = {
+      outDir: 'android-build'
     }
-  } else {
-    return {
-      plugins: [react()],
-      build: {
-        outDir: 'web-build'
-      }
+  } else if (mode === 'web') {
+    userConfig.build = {
+      outDir: 'web-build'
+    }
+  } else if (mode === 'desktop') {
+    userConfig.build = {
+      outDir: 'out/renderer'
     }
   }
+
+  return userConfig
 })

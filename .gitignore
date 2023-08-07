@@ -13,6 +13,9 @@ dist-ssr
 *.local
 android-build
 web-build
+desktop-build
+out
+.env*
 
 # Editor directories and files
 .vscode/*
@@ -55,7 +58,7 @@ $RECYCLE.BIN/
 .DS_Store
 Thumbs.db
 UserInterfaceState.xcuserstate
-.env
+
 
 .package.tmp.json
 
